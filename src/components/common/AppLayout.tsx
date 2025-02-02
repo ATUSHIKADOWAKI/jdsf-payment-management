@@ -6,7 +6,7 @@ import IconButton from '@mui/material/IconButton';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { Outlet } from 'react-router-dom';
-import SideBar from './SideBar';
+import SideBar from '../SideBar';
 
 
 const drawerWidth = 240;
