@@ -8,17 +8,20 @@ import Divider from '@mui/material/Divider';
 import FormLabel from '@mui/material/FormLabel';
 import FormControl from '@mui/material/FormControl';
 import Link from '@mui/material/Link';
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import MuiCard from '@mui/material/Card';
 import { styled } from '@mui/material/styles';
 import ForgotPassword from '../components/ForgotPassword';
-// import AppTheme from './theme/AppTheme';
-// import ColorModeSelect from './theme/ColorModeSelect';
-// import { GoogleIcon, FacebookIcon, SitemarkIcon } from './components/CustomIcons';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import useUserRole from '../hooks/useUserRole';
+import { useState } from 'react';
+import { auth } from '../firebase';
 
 const Card = styled(MuiCard)(({ theme }) => ({
+
     display: 'flex',
     flexDirection: 'column',
     alignSelf: 'center',
@@ -60,7 +63,15 @@ const LogInContainer = styled(Stack)(({ theme }) => ({
     },
 }));
 
+//ログイン画面 本体
 export default function LogIn(props: { disableCustomTheme?: boolean }) {
+
+    const navigate = useNavigate(); // React Routerのnavigate関数
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+
+    const { } = useUserRole();
+
     //メールのエラーを判断するState
     const [emailError, setEmailError] = React.useState(false);
     //メール入力のエラーメッセージを管理するState
@@ -70,7 +81,7 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
     const [passwordError, setPasswordError] = React.useState(false);
     //パスワード入力のエラーメッセージを管理するState
     const [passwordErrorMessage, setPasswordErrorMessage] = React.useState('');
-    
+
     const [open, setOpen] = React.useState(false);
 
     const handleClickOpen = () => {
@@ -81,16 +92,18 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
         setOpen(false);
     };
 
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-        if (emailError || passwordError) {
-            event.preventDefault();
-            return;
+    const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault(); // 🔹 これで URL にデータが載らないようにする
+        if (!validateInputs()) return;
+
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+            alert("ログイン成功！");
+            navigate("/dashboard"); // 成功時にリダイレクト
+        } catch (error) {
+            console.error("ログインエラー:", error);
+            alert(`ログインに失敗しました: `);
         }
-        const data = new FormData(event.currentTarget);
-        console.log({
-            email: data.get('email'),
-            password: data.get('password'),
-        });
     };
 
     const validateInputs = () => {
@@ -132,11 +145,11 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
                         variant="h4"
                         sx={{ width: '100%', fontSize: 'clamp(2rem, 10vw, 2.15rem)' }}
                     >
-                        Sign in
+                        ログインページ
                     </Typography>
                     <Box
                         component="form"
-                        onSubmit={handleSubmit}
+                        onSubmit={handleLogin}
                         noValidate
                         sx={{
                             display: 'flex',
@@ -160,6 +173,8 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
                                 fullWidth
                                 variant="outlined"
                                 color={emailError ? 'error' : 'primary'}
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                             />
                         </FormControl>
                         <FormControl>
@@ -177,6 +192,8 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
                                 fullWidth
                                 variant="outlined"
                                 color={passwordError ? 'error' : 'primary'}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
                             />
                         </FormControl>
                         <FormControlLabel
@@ -188,9 +205,8 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
                             type="submit"
                             fullWidth
                             variant="contained"
-                            onClick={validateInputs}
                         >
-                            Sign in
+                            ログイン
                         </Button>
                         <Link
                             component="button"
@@ -220,13 +236,11 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
                         </Button>
                         <Typography sx={{ textAlign: 'center' }}>
                             Don&apos;t have an account?{' '}
-                            <Link
-                                href="/material-ui/getting-started/templates/sign-in/"
-                                variant="body2"
-                                sx={{ alignSelf: 'center' }}
+                            <RouterLink
+                                to="signup"
                             >
                                 Sign up
-                            </Link>
+                            </RouterLink>
                         </Typography>
                     </Box>
                 </Card>
