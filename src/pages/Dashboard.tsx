@@ -7,7 +7,6 @@ import { Navigate } from 'react-router-dom';
 const Dashboard = () => {
     const { role, loading } = useUserRole();
 
-    console.log(role);
     if (loading) return <p>Loading...</p>;
 
     if (role === "admin") {
