@@ -15,10 +15,11 @@ import Stack from '@mui/material/Stack';
 import MuiCard from '@mui/material/Card';
 import { styled } from '@mui/material/styles';
 import ForgotPassword from '../components/ForgotPassword';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import useUserRole from '../hooks/useUserRole';
 import { useState } from 'react';
-import { auth } from '../firebase';
+import { auth, db, provider } from '../firebase';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 const Card = styled(MuiCard)(({ theme }) => ({
 
@@ -92,10 +93,10 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
         setOpen(false);
     };
 
+    //email & password認証
     const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault(); // 🔹 これで URL にデータが載らないようにする
+        event.preventDefault();
         if (!validateInputs()) return;
-
         try {
             await signInWithEmailAndPassword(auth, email, password);
             alert("ログイン成功！");
@@ -105,6 +106,41 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
             alert(`ログインに失敗しました: `);
         }
     };
+
+    //Google認証
+    const signInWithGoogle = async () => {
+        try {
+            // Googleサインイン
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+
+            // Firestore の users コレクションをチェック
+            const userRef = doc(db, "users", user.uid);
+            const userSnap = await getDoc(userRef);
+
+            // ユーザーが存在しない場合、新規登録
+            if (!userSnap.exists()) {
+                await setDoc(userRef, {
+                    uid: user.uid,
+                    email: user.email,
+                    fullName: "",
+                    title: "",
+                    role: "user", // 管理者 or ユーザー
+                    createdAt: serverTimestamp(),
+                    bank: "",
+                    branch: "",
+                    bankNum: "",
+                    bankHolder: "",
+                })
+            }
+            alert("ログイン成功！");
+            navigate("/dashboard"); // 成功時にリダイレクト
+        } catch (error) {
+            console.error("Googleログインエラー:", error);
+        }
+    };
+
+
 
     const validateInputs = () => {
         const email = document.getElementById('email') as HTMLInputElement;
@@ -223,16 +259,9 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
                         <Button
                             fullWidth
                             variant="outlined"
-                            onClick={() => alert('Sign in with Google')}
+                            onClick={() => signInWithGoogle()}
                         >
                             Sign in with Google
-                        </Button>
-                        <Button
-                            fullWidth
-                            variant="outlined"
-                            onClick={() => alert('Sign in with Facebook')}
-                        >
-                            Sign in with Facebook
                         </Button>
                         <Typography sx={{ textAlign: 'center' }}>
                             Don&apos;t have an account?{' '}

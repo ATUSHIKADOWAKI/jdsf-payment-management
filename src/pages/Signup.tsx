@@ -23,8 +23,14 @@ const Signup: React.FC = () => {
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: user.email,
+        fullName: "",
+        title: "",
         role: "user", // 管理者 or ユーザー
-        createdAt: serverTimestamp(), // Firestore のタイムスタンプ
+        createdAt: serverTimestamp(),
+        bank: "",
+        branch: "",
+        bankNum: "",
+        bankHolder: "",
       });
       navigate("/");
 

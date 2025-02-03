@@ -1,9 +1,8 @@
-import React from 'react'
 import AppLayout from './common/AppLayout'
 
 const UserDashboard = () => {
   return (
-    <AppLayout/>
+    <AppLayout />
   )
 }
 

@@ -15,8 +15,8 @@ interface menuItem {
 
 const SideBar = ({ drawerWidth, mobileOpen, handleDrawerToggle }: SidebarProps) => {
     const MenuItems: menuItem[] = [
-        { text: "精算入力", path: "/dashboard/payment" },
         { text: "精算履歴", path: "/dashboard/history" },
+        { text: "精算入力", path: "/dashboard/payment" },
         { text: "アカウント設定", path: "/dashboard/account" },
         { text: "ログアウト", path: "/" },
     ]
