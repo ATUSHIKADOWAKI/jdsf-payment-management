@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Button, TextField, Typography, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItem, ListItemText, IconButton } from "@mui/material";
+import { Box, Button, TextField, Typography, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItem, ListItemText, IconButton, Grid } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -11,7 +11,7 @@ const History = () => {
   const [projectName, setProjectName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  
+
   // 申請後の編集制限
   const [isSubmitted, setIsSubmitted] = useState(false);
 
@@ -26,6 +26,7 @@ const History = () => {
 
   // 経費追加・編集用モーダルを開く
   const openModal = (index: number | null = null) => {
+    console.log(isModalOpen);
     if (index !== null) {
       setCurrentExpense(expenses[index]);
       setEditingIndex(index);
@@ -56,13 +57,13 @@ const History = () => {
   // 🆕 コメントを追加する
   const handleAddComment = () => {
     if (commentText.trim() === "") return;
-    
+
     const newComment = {
       text: commentText,
       role: "user", // ここは将来的に Firestore からユーザー情報を取得して変更可能
       timestamp: new Date().toLocaleTimeString(),
     };
-    
+
     setComments([...comments, newComment]);
     setCommentText(""); // 入力欄をクリア
   };
@@ -92,13 +93,21 @@ const History = () => {
     <Box sx={{ maxWidth: "700px", margin: "auto", p: 3 }}>
       {/* 申請情報 */}
       <Typography variant="h5" gutterBottom>申請情報</Typography>
-      <TextField label="申請日" value={today} disabled fullWidth sx={{ mb: 2 }} />
-      <TextField label="プロジェクト名" value={projectName} onChange={(e) => setProjectName(e.target.value)} fullWidth sx={{ mb: 2 }} />
-      <Box sx={{ display: "flex", gap: 2 }}>
-        <TextField label="開始日" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} />
-        <TextField label="終了日" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} />
-      </Box>
+      <Grid container spacing={3}>
+        <Grid item xs={3}>
+          <TextField label="申請日" value={today} disabled fullWidth sx={{ mb: 2 }} />
+        </Grid>
+        <Grid item xs={9}>
+          <TextField label="プロジェクト名" value={projectName} onChange={(e) => setProjectName(e.target.value)} fullWidth sx={{ mb: 2 }} />
+        </Grid>
 
+        <Grid item xs={6}>
+          <TextField label="事業開始日" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} />
+        </Grid>
+        <Grid item xs={6}>
+          <TextField label="事業終了日" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} />
+        </Grid>
+      </Grid>
       {/* 経費リスト */}
       <Typography variant="h6" sx={{ mt: 3 }}>経費一覧</Typography>
       <List>
@@ -119,14 +128,21 @@ const History = () => {
       </List>
 
       {/* 経費追加ボタン */}
-      {!isSubmitted && (
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => openModal()} fullWidth sx={{ mt: 2 }}>
-          経費を追加
-        </Button>
-      )}
+      {
+        !isSubmitted && (
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => openModal()} fullWidth sx={{ mt: 2 }}>
+            経費を追加
+          </Button>
+        )
+      }
+      {
+        isModalOpen && (
+         <Typography>開いたよ</Typography>
+        )
+      }
 
       {/* 🆕 コメント欄 */}
-      <Typography variant="h6" sx={{ mt: 3 }}>コメントと記載ください。</Typography>
+      <Typography variant="h6" sx={{ mt: 3 }}>コメントを記載ください。</Typography>
       <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
         <TextField
           label="コメントを入力"
@@ -161,7 +177,7 @@ const History = () => {
         <Button variant="outlined" onClick={handleSaveDraft} disabled={isSubmitted}>一時保存</Button>
         <Button variant="contained" color="primary" onClick={handleSubmit} disabled={isSubmitted}>申請</Button>
       </Box>
-    </Box>
+    </Box >
   );
 };
 
