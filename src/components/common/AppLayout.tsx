@@ -16,12 +16,10 @@ const drawerWidth = 240;
 export default function AppLayout() {
 
     const [mobileOpen, setMobileOpen] = React.useState(false);
-    const [isClosing, setIsClosing] = React.useState(false);
+    // const [isClosing, setIsClosing] = React.useState(false);
 
     const handleDrawerToggle = () => {
-        if (!isClosing) {
-            setMobileOpen(!mobileOpen);
-        }
+        setMobileOpen((prevState) => !prevState);
     };
 
     return (
@@ -47,10 +45,10 @@ export default function AppLayout() {
                         edge="start"
                         onClick={handleDrawerToggle}
                         sx={{ mr: 2, display: { md: 'none' } }}
-                    >
+                    >ボタン
                     </IconButton>
                     <Typography variant="h6" noWrap component="div">
-                        JDSF BREAKING 精算
+                        {/* JDSF BREAKING 精算 */}
                     </Typography>
                 </Toolbar>
             </AppBar>
@@ -71,4 +69,6 @@ export default function AppLayout() {
             </Box>
         </Box>
     );
+
+
 }

@@ -33,12 +33,12 @@ const SideBar = ({ drawerWidth, mobileOpen, handleDrawerToggle }: SidebarProps) 
 
     const drawer = (
         <div>
-            <Toolbar />
+            <Toolbar sx={{ backgroundColor: "#1976d2", color: "white" }} >JDSF BREAKING 精算
+            </Toolbar>
             <Divider />
             <List>
                 {MenuItems.map((item, index) => (
                     <NavLink key={item.text} to={item.path} style={({ isActive }) => {
-                        console.log("選択されたメニューは", item.text, isActive)
                         return {
                             ...baseLinkStyle,
                             ...(isActive ? activeLinkStyle : {})
@@ -68,10 +68,10 @@ const SideBar = ({ drawerWidth, mobileOpen, handleDrawerToggle }: SidebarProps) 
                 open={mobileOpen}
                 onClose={handleDrawerToggle}
                 ModalProps={{
-                    keepMounted: true, // Better open performance on mobile.
+                    keepMounted: true, 
                 }}
                 sx={{
-                    display: { xs: 'block', sm: 'none' },
+                    display: { xs: 'block', sm: 'block', md: 'none' }, // 900px未満ではモバイルメニューを使う
                     '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
                 }}
             >
