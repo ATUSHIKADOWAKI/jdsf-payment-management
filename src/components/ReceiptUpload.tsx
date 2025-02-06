@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "@mui/material";
 
-const ReceiptUpload = ({ index, onUpload }: { index: number; onUpload: (file: File) => void }) => {
+const ReceiptUpload = ({ onUpload }: { onUpload: (file: File) => void }) => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
       onUpload(event.target.files[0]);
