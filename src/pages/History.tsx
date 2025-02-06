@@ -1,10 +1,23 @@
 import React, { useState } from "react";
-import { Box, Button, TextField, Typography, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItem, ListItemText, IconButton, Grid } from "@mui/material";
+import { Box, Button, TextField, Typography, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItem, ListItemText, IconButton, Grid, MenuItem, Select } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import RemoveIcon from "@mui/icons-material/Remove";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SendIcon from "@mui/icons-material/Send";
+import ReceiptUpload from "../components/ReceiptUpload";
 
+
+type ExpenseEntry = {
+  date: string;
+  vendor: string;
+  description: string;
+  category: string;
+  subcategory: string;
+  amount: string;
+  currency: string;
+  receipt: File | null;
+};
 // 精算ページのUIを履歴ページでテスト中
 const History = () => {
   const today = new Date().toISOString().split("T")[0];
@@ -19,16 +32,19 @@ const History = () => {
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState<{ text: string; role: string; timestamp: string }[]>([]);
 
-  const [expenses, setExpenses] = useState<{ date: string; vendor: string; amount: number | "" }[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseEntry[]>([
+    { date: "", vendor: "", description: "", category: "", subcategory: "", amount: "", currency: "JPY", receipt: null }
+  ]);
+
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentExpense, setCurrentExpense] = useState<{ date: string; vendor: string; amount: number | "" }>({ date: today, vendor: "", amount: "" });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   // 経費追加・編集用モーダルを開く
   const openModal = (index: number | null = null) => {
-    console.log(isModalOpen);
     if (index !== null) {
-      setCurrentExpense(expenses[index]);
+      // setCurrentExpense(expenses[index]);
       setEditingIndex(index);
     } else {
       setCurrentExpense({ date: today, vendor: "", amount: "" });
@@ -37,17 +53,17 @@ const History = () => {
     setIsModalOpen(true);
   };
 
-  // 経費を追加・更新する
-  const handleSaveExpense = () => {
-    if (editingIndex !== null) {
-      const updatedExpenses = [...expenses];
-      updatedExpenses[editingIndex] = currentExpense;
-      setExpenses(updatedExpenses);
-    } else {
-      setExpenses([...expenses, currentExpense]);
-    }
-    setIsModalOpen(false);
-  };
+  // // 経費を追加・更新する
+  // const handleSaveExpense = () => {
+  //   if (editingIndex !== null) {
+  //     const updatedExpenses = [...expenses];
+  //     updatedExpenses[editingIndex] = currentExpense;
+  //     setExpenses(updatedExpenses);
+  //   } else {
+  //     setExpenses([...expenses, currentExpense]);
+  //   }
+  //   setIsModalOpen(false);
+  // };
 
   // 経費を削除する
   const handleDeleteExpense = (index: number) => {
@@ -75,10 +91,13 @@ const History = () => {
     }
   };
 
+  const removeRow = (index: number) => {
+    const newExpenses = expenses.filter((_, i) => i !== index);
+    setExpenses(newExpenses);
+  };
+
   // 🆕 申請処理（仮）
   const handleSubmit = () => {
-    console.log("送信データ:", expenses);
-    console.log("コメント:", comments);
     alert("申請が完了しました！");
     setIsSubmitted(true); // 申請後に編集不可にする
   };
@@ -87,6 +106,14 @@ const History = () => {
   const handleSaveDraft = () => {
     localStorage.setItem("draft_expenses", JSON.stringify(expenses));
     alert("一時保存しました！");
+  };
+
+
+
+  const handleChange = (index: number, field: keyof ExpenseEntry, value: string | File | null) => {
+    const newExpenses = [...expenses];
+    newExpenses[index][field] = value as never; // TypeScript の型変換
+    setExpenses(newExpenses);
   };
 
   return (
@@ -108,41 +135,103 @@ const History = () => {
           <TextField label="事業終了日" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} />
         </Grid>
       </Grid>
-      {/* 経費リスト */}
-      <Typography variant="h6" sx={{ mt: 3 }}>経費一覧</Typography>
-      <List>
-        {expenses.map((expense, index) => (
-          <ListItem key={index} secondaryAction={
-            <>
-              <IconButton edge="end" onClick={() => openModal(index)} disabled={isSubmitted}>
-                <EditIcon />
-              </IconButton>
-              <IconButton edge="end" onClick={() => handleDeleteExpense(index)} disabled={isSubmitted}>
-                <DeleteIcon />
-              </IconButton>
-            </>
-          }>
-            <ListItemText primary={`No.${index + 1} ${expense.vendor} ¥${expense.amount}`} secondary={expense.date} />
-          </ListItem>
-        ))}
-      </List>
+      {
+        expenses.map((expense, index) => (
+          <Box
+            key={index}
+            sx={{ maxWidth: "700px", margin: "auto", p: 7 }}
+          >
+            <Typography variant="h5" gutterBottom>経費入力</Typography>
 
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  size="small"
+                  label="取引日"
+                  type="date"
+                  value={expense.date}
+                  onChange={(e) => handleChange(index, "date", e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField size="small" label="取引先" value={expense.vendor} onChange={(e) => handleChange(index, "vendor", e.target.value)} fullWidth />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField size="small" label="内容" value={expense.description} onChange={(e) => handleChange(index, "description", e.target.value)} fullWidth />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField size="small" label="収支科目" value={expense.category} onChange={(e) => handleChange(index, "category", e.target.value)} fullWidth />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField size="small" label="サブ収支科目" value={expense.subcategory} onChange={(e) => handleChange(index, "subcategory", e.target.value)} fullWidth />
+              </Grid>
+              <Grid item xs={12}>
+
+                <TextField size="small" label="支出額" type="number" value={expense.amount} onChange={(e) => handleChange(index, "amount", e.target.value)} fullWidth />
+              </Grid>
+              <Grid item xs={12}>
+                <Select size="small" value={expense.currency} onChange={(e) => handleChange(index, "currency", e.target.value)} fullWidth>
+                  <MenuItem value="JPY">JPY</MenuItem>
+                  <MenuItem value="USD">USD</MenuItem>
+                  <MenuItem value="EUR">EUR</MenuItem>
+                </Select>
+              </Grid>
+
+              {/* 証票アップロード */}
+              <ReceiptUpload
+                index={index}
+                onUpload={(file) => handleChange(index, "receipt", file)}
+              />
+
+              {index > 0 && (
+                <IconButton onClick={() => removeRow(index)}>
+                  <RemoveIcon />
+                </IconButton>
+              )}
+            </Grid>
+            {
+              !isSubmitted && (
+                <Button variant="contained" startIcon={<AddIcon />} onClick={() => openModal()} fullWidth sx={{ mt: 2 }}>
+                  経費を追加
+                </Button>
+              )
+            }
+          </Box>
+        ))
+      }
       {/* 経費追加ボタン */}
+
+
+      {/* 経費リスト */}
       {
-        !isSubmitted && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => openModal()} fullWidth sx={{ mt: 2 }}>
-            経費を追加
-          </Button>
+        expenses.length > 1 && (
+          <Box>
+            <Typography variant="h6" sx={{ mt: 3 }}>経費一覧</Typography>
+            <List>
+              {expenses.map((expense, index) => (
+                <ListItem key={index} secondaryAction={
+                  <>
+                    <IconButton edge="end" onClick={() => openModal(index)} disabled={isSubmitted}>
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton edge="end" onClick={() => handleDeleteExpense(index)} disabled={isSubmitted}>
+                      <DeleteIcon />
+                    </IconButton>
+                  </>
+                }>
+                  <ListItemText primary={`No.${index + 1} ${expense.vendor} ¥${expense.amount}`} secondary={expense.date} />
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+
         )
       }
-      {
-        isModalOpen && (
-         <Typography>開いたよ</Typography>
-        )
-      }
+
 
       {/* 🆕 コメント欄 */}
-      <Typography variant="h6" sx={{ mt: 3 }}>コメントを記載ください。</Typography>
+      <Typography variant="h6" sx={{ mt: 3 }}>コメント(任意)</Typography>
       <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
         <TextField
           label="コメントを入力"
