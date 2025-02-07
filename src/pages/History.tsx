@@ -11,8 +11,11 @@ import {
   Grid,
   MenuItem,
   Select,
+  Modal,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import CloseIcon from "@mui/icons-material/Close";
+
 import RemoveIcon from "@mui/icons-material/Remove";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -113,18 +116,7 @@ const History = () => {
     { text: string; role: string; timestamp: string }[]
   >([]);
 
-  const [expenses, setExpenses] = useState<Expense[]>([
-    {
-      date: "",
-      vendor: "",
-      description: "",
-      category: "",
-      subcategory: "",
-      amount: "",
-      currency: "JPY",
-      receipt: null,
-    },
-  ]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
 
   const [currentExpense, setCurrentExpense] = useState<Expense>({
     date: "",
@@ -137,18 +129,37 @@ const History = () => {
     receipt: null,
   });
 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  const customStyles = {
+    content: {
+      top: "20%",
+      left: "50%",
+      right: "auto",
+      bottom: "auto",
+      marginRight: "-50%",
+      transform: "translate(-50%, -50%)",
+      minWidth: "50%",
+      maxWidth: "50%",
+    },
+  };
 
   // 経費を追加・更新する
   const handleSaveExpense = () => {
-   setExpenses([...expenses,currentExpense]);
-    // if (editingIndex !== null) {
-    //   const updatedExpenses = [...currentExpense];
-    //   updatedExpenses[editingIndex] = currentExpense;
-    //   setExpenses(updatedExpenses);
-    // } else {
-    //   setExpenses([...expenses, currentExpense]);
-    // }
+    if (
+      !currentExpense.date ||
+      !currentExpense.vendor ||
+      !currentExpense.amount
+    ) {
+      alert("日付、取引先、金額を入力してください。");
+      return;
+    }
+    setExpenses((prevExpenses) => [
+      ...prevExpenses.filter((expense) => expense.date !== ""),
+      { ...currentExpense, date: currentExpense.date || today },
+    ]);
   };
 
   // 経費を削除する
@@ -166,6 +177,7 @@ const History = () => {
       timestamp: new Date().toLocaleTimeString(),
     };
 
+    console.log(expenses.length);
     setComments([...comments, newComment]);
     setCommentText(""); // 入力欄をクリア
   };
@@ -249,130 +261,169 @@ const History = () => {
           />
         </Grid>
       </Grid>
-      <Box sx={{ maxWidth: "700px", margin: "auto", p: 7 }}>
-        <Typography variant="h5" gutterBottom>
-          経費入力
-        </Typography>
+      <Modal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        sx={{ maxWidth: "700px", margin: "auto", p: 7 }}
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: "80%",
+            maxWidth: "700px",
+            bgcolor: "white",
+            boxShadow: 24,
+            p: 4,
+            borderRadius: 2,
+          }}
+        >
+          <IconButton
+            onClick={() => setIsModalOpen(false)}
+            sx={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+          <Typography variant="h5" gutterBottom>
+            経費入力
+          </Typography>
 
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <TextField
-              size="small"
-              label="取引日"
-              type="date"
-              value={currentExpense.date}
-              onChange={(e) => handleChange("date", e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-          </Grid>
-          <Grid item xs={6}>
-            <TextField
-              size="small"
-              label="取引先"
-              value={currentExpense.vendor}
-              onChange={(e) => handleChange("vendor", e.target.value)}
-              fullWidth
-            />
-          </Grid>
-          <Grid item xs={6}>
-            <TextField
-              size="small"
-              label="内容"
-              value={currentExpense.description}
-              onChange={(e) => handleChange("description", e.target.value)}
-              fullWidth
-            />
-          </Grid>
-          <Grid item xs={6}>
-            <Select
-              size="small"
-              value={currentExpense.category}
-              onChange={(e) => handleChange("category", e.target.value)}
-              displayEmpty
-              fullWidth
-            >
-              {/* 収支科目のセレクトボックス */}
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                size="small"
+                label="取引日"
+                type="date"
+                value={currentExpense.date}
+                onChange={(e) => handleChange("date", e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                size="small"
+                label="取引先"
+                value={currentExpense.vendor}
+                onChange={(e) => handleChange("vendor", e.target.value)}
+                fullWidth
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                size="small"
+                label="内容"
+                value={currentExpense.description}
+                onChange={(e) => handleChange("description", e.target.value)}
+                fullWidth
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <Select
+                size="small"
+                value={currentExpense.category}
+                onChange={(e) => handleChange("category", e.target.value)}
+                displayEmpty
+                fullWidth
+              >
+                {/* 収支科目のセレクトボックス */}
 
-              <MenuItem value="" disabled>
-                収支科目を選択
-              </MenuItem>
-              {Object.keys(categoryOptions).map((category) => (
-                <MenuItem key={category} value={category}>
-                  {category}
+                <MenuItem value="" disabled>
+                  収支科目を選択
                 </MenuItem>
-              ))}
-            </Select>
-          </Grid>
-          {/* サブ収支科目のセレクトボックス */}
-          <Grid item xs={6}>
-            <Select
-              size="small"
-              value={currentExpense.subcategory}
-              onChange={(e) => handleChange("subcategory", e.target.value)}
-              displayEmpty
-              disabled={!currentExpense.category}
-              fullWidth
-            >
-              <MenuItem value="" disabled>
-                サブ収支科目を選択
-              </MenuItem>
-              {currentExpense.category &&
-                categoryOptions[currentExpense.category].map((subcategory) => (
-                  <MenuItem key={subcategory} value={subcategory}>
-                    {subcategory}
+                {Object.keys(categoryOptions).map((category) => (
+                  <MenuItem key={category} value={category}>
+                    {category}
                   </MenuItem>
                 ))}
-            </Select>
-          </Grid>
-          <Grid item xs={12}>
-            <TextField
-              size="small"
-              label="支出額"
-              type="number"
-              value={currentExpense.amount}
-              onChange={(e) => handleChange("amount", e.target.value)}
-              fullWidth
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <Select
-              size="small"
-              value={currentExpense.currency}
-              onChange={(e) => handleChange("currency", e.target.value)}
-              fullWidth
-            >
-              <MenuItem value="JPY">JPY</MenuItem>
-              <MenuItem value="USD">USD</MenuItem>
-              <MenuItem value="EUR">EUR</MenuItem>
-            </Select>
-          </Grid>
-          {/* 証票アップロード */}
-          <ReceiptUpload onUpload={(file) => handleChange("receipt", file)} />
+              </Select>
+            </Grid>
+            {/* サブ収支科目のセレクトボックス */}
+            <Grid item xs={6}>
+              <Select
+                size="small"
+                value={currentExpense.subcategory}
+                onChange={(e) => handleChange("subcategory", e.target.value)}
+                displayEmpty
+                disabled={!currentExpense.category}
+                fullWidth
+              >
+                <MenuItem value="" disabled>
+                  サブ収支科目を選択
+                </MenuItem>
+                {currentExpense.category &&
+                  categoryOptions[currentExpense.category].map(
+                    (subcategory) => (
+                      <MenuItem key={subcategory} value={subcategory}>
+                        {subcategory}
+                      </MenuItem>
+                    )
+                  )}
+              </Select>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                size="small"
+                label="支出額"
+                type="number"
+                value={currentExpense.amount}
+                onChange={(e) => handleChange("amount", e.target.value)}
+                fullWidth
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Select
+                size="small"
+                value={currentExpense.currency}
+                onChange={(e) => handleChange("currency", e.target.value)}
+                fullWidth
+              >
+                <MenuItem value="JPY">JPY</MenuItem>
+                <MenuItem value="USD">USD</MenuItem>
+                <MenuItem value="EUR">EUR</MenuItem>
+              </Select>
+            </Grid>
+            {/* 証票アップロード */}
+            <ReceiptUpload onUpload={(file) => handleChange("receipt", file)} />
 
-          {/* {index > 0 && (
+            {/* {index > 0 && (
             <IconButton onClick={() => removeRow(index)}>
               <RemoveIcon />
             </IconButton>
           )}
            */}
-        </Grid>
-        {!isSubmitted && (
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleSaveExpense()}
-            fullWidth
-            sx={{ mt: 2 }}
-          >
-            経費を追加
-          </Button>
-        )}
-      </Box>
+          </Grid>
+          {!isSubmitted && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleSaveExpense()}
+              fullWidth
+              sx={{ mt: 2 }}
+            >
+              経費を追加
+            </Button>
+          )}
+        </Box>
+      </Modal>
 
       {/* 経費追加ボタン */}
-
+      <Button
+        variant="contained"
+        startIcon={<AddIcon />}
+        onClick={() => setIsModalOpen(true)}
+        fullWidth
+        sx={{ mt: 2 }}
+      >
+        経費を追加
+      </Button>
       {/* 経費リスト */}
-      {expenses.length > 1 && (
+      {expenses.length > 0 && (
         <Box>
           <Typography variant="h6" sx={{ mt: 3 }}>
             経費一覧
@@ -404,7 +455,7 @@ const History = () => {
                   primary={`No.${index + 1} ${expense.vendor} ¥${
                     expense.amount
                   }`}
-                  secondary={expense.date}
+                  secondary={`${expense.date} ${expense.description}`}
                 />
               </ListItem>
             ))}
