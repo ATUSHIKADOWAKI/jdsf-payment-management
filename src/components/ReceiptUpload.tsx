@@ -10,7 +10,7 @@ const ReceiptUpload = ({
   onUploadEnd,
   onClear,
 }: {
-  onUpload: (url: string, name: string) => void; // ✅ 修正
+  onUpload: (url: string, name: string) => void;
   onUploadStart: () => void;
   onUploadEnd: () => void;
   onClear: () => void;
@@ -44,8 +44,8 @@ const ReceiptUpload = ({
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
 
-      setDownloadURL(url); // ✅ URL を保存
-      onUpload(url, fileName); // ✅ 修正: 親コンポーネントにURLとファイル名を渡す
+      setDownloadURL(url); 
+      onUpload(url, fileName); 
     } catch (error) {
       console.error("アップロードエラー:", error);
       alert("アップロードに失敗しました。");
