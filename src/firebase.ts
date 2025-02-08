@@ -6,6 +6,7 @@ import { getStorage } from "firebase/storage";
 const firebaseConfig = {
   apiKey: "AIzaSyAOI1e5k8NwTF9vT6UjJCCcJ5BYolz0EnI",
   authDomain: "jdsf-payment-management.firebaseapp.com",
+  databaseURL: "https://jdsf-payment-management-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "jdsf-payment-management",
   storageBucket: "jdsf-payment-management.firebasestorage.app",
   messagingSenderId: "869417149271",

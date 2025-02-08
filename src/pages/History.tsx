@@ -20,7 +20,15 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import SendIcon from "@mui/icons-material/Send";
 import ReceiptUpload from "../components/ReceiptUpload";
 import { storage } from "../firebase"; // Firebase 設定をインポート
-import { addDoc, collection, getFirestore } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getFirestore,
+  Timestamp,
+} from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 type Expense = {
   date: string;
@@ -238,8 +246,63 @@ const History = () => {
   };
 
   // 🆕 申請処理（仮）
-  const handleSubmit = () => {
-    alert("申請が完了しました！");
+  const handleSubmit = async () => {
+    const auth = getAuth();
+    console.log("✅ ログイン中のユーザー:", auth.currentUser);
+
+    const user = auth.currentUser;
+    if (!user) {
+      alert("ログインしてください");
+      return;
+    }
+    if (!projectName || !startDate || !endDate || expenses.length === 0) {
+      alert("必要な情報をすべて入力してください。");
+      return;
+    }
+
+    const db = getFirestore();
+
+    // 🔥 ユーザーの role を取得
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) {
+      alert("ユーザー情報が見つかりません");
+      return;
+    }
+
+    const userData = userSnap.data();
+    console.log("✅ ユーザー情報:", userData);
+
+    const settlementData = {
+      applicantId: user.uid,
+      applicantName: user.displayName || "未設定",
+      projectName,
+      startDate,
+      endDate,
+      submittedAt: Timestamp.now(),
+      expenses,
+      status: "申請中",
+      comments: [],
+      role: userData.role, // 🔥 ユーザーの role を保存
+    };
+    console.log("セトルメントデータ", settlementData);
+
+    // 🔥 Firestore にデータを保存する直前でログを確認
+    console.log("📝 Firestore に送るデータ:", settlementData);
+
+    try {
+      const docRef = await addDoc(
+        collection(db, "settlements"),
+        settlementData
+      );
+      alert("精算申請を送信しました");
+      console.log("✅ Firestore に保存成功: ", docRef.id);
+    } catch (error) {
+      console.error("❌ Firestore 保存エラー:", error);
+      alert("Firestore に保存できませんでした。");
+    }
+
     setIsSubmitted(true); // 申請後に編集不可にする
   };
 
