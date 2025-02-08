@@ -24,7 +24,7 @@ import {
   where,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import Payment from "./Payment"
+import Payment from "./Payment";
 
 type Expense = {
   date: string;
@@ -61,6 +61,7 @@ const History = () => {
   const [selectedSettlement, setSelectedSettlement] =
     useState<Settlement | null>(null);
   const [open, setOpen] = useState(false);
+  const [editable, setEditable] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -72,8 +73,8 @@ const History = () => {
         );
         const querySnapshot = await getDocs(q);
         const settlementsData: Settlement[] = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
-          return { id: doc.id, ...data } as Settlement;
+          const data = doc.data() as Omit<Settlement, "id">;
+          return { id: doc.id, ...data };
         });
         setSettlements(settlementsData);
         setFilteredSettlements(settlementsData);
@@ -97,7 +98,8 @@ const History = () => {
   };
 
   const handleOpenModal = (settlement: Settlement) => {
-    setSelectedSettlement(settlement);
+    setSelectedSettlement({ ...settlement });
+    setEditable(settlement.status === "編集中" || settlement.status === "却下");
     setOpen(true);
   };
 
@@ -147,7 +149,7 @@ const History = () => {
         )}
       </List>
 
-      {/* 精算入力ページのモーダル */}
+      {/* モーダル */}
       <Dialog open={open} onClose={handleCloseModal} fullWidth maxWidth="md">
         <DialogTitle>
           {selectedSettlement?.projectName}
@@ -164,7 +166,7 @@ const History = () => {
           {selectedSettlement && (
             <Payment
               selectedSettlement={selectedSettlement}
-              isEditable={selectedSettlement.status === "編集中" || selectedSettlement.status === "却下"}
+              isEditable={editable}
             />
           )}
         </DialogContent>
@@ -177,4 +179,3 @@ const History = () => {
 };
 
 export default History;
-
