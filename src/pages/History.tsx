@@ -15,12 +15,12 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
-
-import RemoveIcon from "@mui/icons-material/Remove";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SendIcon from "@mui/icons-material/Send";
 import ReceiptUpload from "../components/ReceiptUpload";
+import { storage } from "../firebase"; // Firebase 設定をインポート
+import { addDoc, collection, getFirestore } from "firebase/firestore";
 
 type Expense = {
   date: string;
@@ -30,7 +30,8 @@ type Expense = {
   subcategory: string;
   amount: string;
   currency: string;
-  receipt: File | null;
+  receipt: string | null;
+  fileName: string | null;
 };
 
 const categoryOptions: Record<string, string[]> = {
@@ -106,6 +107,7 @@ const History = () => {
   const [projectName, setProjectName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const db = getFirestore(); // Firestore のインスタンスを取得
 
   // 申請後の編集制限
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -116,8 +118,7 @@ const History = () => {
     { text: string; role: string; timestamp: string }[]
   >([]);
 
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-
+  //精算入力フォーム用
   const [currentExpense, setCurrentExpense] = useState<Expense>({
     date: "",
     vendor: "",
@@ -127,27 +128,31 @@ const History = () => {
     amount: "",
     currency: "",
     receipt: null,
+    fileName: null,
   });
 
+  //精算一覧 表示用
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
-
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const handleUploadStart = () => setLoading(true);
+  const handleUploadEnd = () => setLoading(false);
+  const [fileName, setFileName] = useState<string | null>(null);
 
-  const customStyles = {
-    content: {
-      top: "20%",
-      left: "50%",
-      right: "auto",
-      bottom: "auto",
-      marginRight: "-50%",
-      transform: "translate(-50%, -50%)",
-      minWidth: "50%",
-      maxWidth: "50%",
-    },
+  const handleAddNewExpense = () => {
+    setIsModalOpen(true);
+    setCurrentExpense((prev) => ({
+      ...prev,
+      receipt: null,
+    }));
+    setFileName(null);
+    setEditingIndex(null);
   };
 
   // 経費を追加・更新する
-  const handleSaveExpense = () => {
+  const handleSaveExpense = async () => {
     if (
       !currentExpense.date ||
       !currentExpense.vendor ||
@@ -156,15 +161,59 @@ const History = () => {
       alert("日付、取引先、金額を入力してください。");
       return;
     }
-    setExpenses((prevExpenses) => [
-      ...prevExpenses.filter((expense) => expense.date !== ""),
-      { ...currentExpense, date: currentExpense.date || today },
-    ]);
+
+    //編集モード
+    if (editingIndex !== null) {
+      const updatedExpenses = [...expenses];
+      updatedExpenses[editingIndex] = {
+        ...currentExpense,
+      };
+      setExpenses(updatedExpenses);
+      setEditingIndex(null);
+    } else {
+      setExpenses((prev) => [...prev, { ...currentExpense }]);
+    }
+    //Firestoreに保存
+    try {
+      await addDoc(collection(db, "expenses"), currentExpense);
+      alert("Firestoreに保存しました");
+    } catch (error) {
+      console.error("Firestore 保存エラー:", error);
+      alert("Firestoreに保存に失敗しました。");
+    }
+    setCurrentExpense((prev) => ({ ...prev, receipt: "" }));
+  };
+
+  //経費を編集
+  const modifyExpense = (index: number) => {
+    setIsModalOpen(true);
+    const expense = expenses[index];
+
+    setCurrentExpense({ ...expense });
+
+    if (expense.fileName) {
+      setFileName(expense.fileName);
+    } else {
+      setFileName(null);
+    }
+    setEditingIndex(index);
   };
 
   // 経費を削除する
   const handleDeleteExpense = (index: number) => {
     setExpenses(expenses.filter((_, i) => i !== index));
+  };
+
+  const handleReciptUpload = (url: string, name: string) => {
+    setCurrentExpense((prev) => ({ ...prev, receipt: url, fileName: name }));
+    if (name) {
+      setFileName(name);
+    }
+  };
+
+  const hancleClearReceipt = () => {
+    setCurrentExpense((prev) => ({ ...prev, receipt: "" }));
+    setFileName(null);
   };
 
   // 🆕 コメントを追加する
@@ -177,7 +226,6 @@ const History = () => {
       timestamp: new Date().toLocaleTimeString(),
     };
 
-    console.log(expenses.length);
     setComments([...comments, newComment]);
     setCommentText(""); // 入力欄をクリア
   };
@@ -187,11 +235,6 @@ const History = () => {
     if (!isSubmitted) {
       setComments(comments.filter((_, i) => i !== index));
     }
-  };
-
-  const removeRow = (index: number) => {
-    const newExpenses = expenses.filter((_, i) => i !== index);
-    setExpenses(newExpenses);
   };
 
   // 🆕 申請処理（仮）
@@ -388,9 +431,33 @@ const History = () => {
                 <MenuItem value="EUR">EUR</MenuItem>
               </Select>
             </Grid>
-            {/* 証票アップロード */}
-            <ReceiptUpload onUpload={(file) => handleChange("receipt", file)} />
-
+            <Grid item xs={12}>
+              {/* 証票アップロード */}
+              <ReceiptUpload
+                onUpload={handleReciptUpload}
+                onUploadStart={handleUploadStart}
+                onUploadEnd={handleUploadEnd}
+                onClear={hancleClearReceipt}
+              />
+              <Typography variant="body2">
+                {currentExpense.receipt ? (
+                  <a
+                    href={currentExpense.receipt}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {fileName || "ファイルを表示"}
+                  </a>
+                ) : (
+                  "ファイル未選択"
+                )}
+              </Typography>
+              {fileName && (
+                <Button onClick={hancleClearReceipt} color="error">
+                  削除
+                </Button>
+              )}
+            </Grid>
             {/* {index > 0 && (
             <IconButton onClick={() => removeRow(index)}>
               <RemoveIcon />
@@ -405,6 +472,7 @@ const History = () => {
               onClick={() => handleSaveExpense()}
               fullWidth
               sx={{ mt: 2 }}
+              disabled={loading}
             >
               経費を追加
             </Button>
@@ -416,7 +484,7 @@ const History = () => {
       <Button
         variant="contained"
         startIcon={<AddIcon />}
-        onClick={() => setIsModalOpen(true)}
+        onClick={handleAddNewExpense}
         fullWidth
         sx={{ mt: 2 }}
       >
@@ -436,7 +504,7 @@ const History = () => {
                   <>
                     <IconButton
                       edge="end"
-                      onClick={() => openModal(index)}
+                      onClick={() => modifyExpense(index)}
                       disabled={isSubmitted}
                     >
                       <EditIcon />
@@ -457,11 +525,25 @@ const History = () => {
                   }`}
                   secondary={`${expense.date} ${expense.description}`}
                 />
+                {expense.receipt && (
+                  <a
+                    href={expense.receipt}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {expense.fileName}
+                  </a>
+                )}
               </ListItem>
             ))}
           </List>
         </Box>
       )}
+
+      <Typography variant="h6" sx={{ mt: 3 }}>
+        合計額:
+        {expenses.reduce((total, item) => total + Number(item.amount), 0)}円
+      </Typography>
 
       {/* 🆕 コメント欄 */}
       <Typography variant="h6" sx={{ mt: 3 }}>

@@ -148,6 +148,7 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
 
         let isValid = true;
 
+        //emailバリデーション
         if (!email.value || !/\S+@\S+\.\S+/.test(email.value)) {
             setEmailError(true);
             setEmailErrorMessage('Please enter a valid email address.');
@@ -156,7 +157,7 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
             setEmailError(false);
             setEmailErrorMessage('');
         }
-
+        //パスワードバリデーション
         if (!password.value || password.value.length < 6) {
             setPasswordError(true);
             setPasswordErrorMessage('Password must be at least 6 characters long.');
