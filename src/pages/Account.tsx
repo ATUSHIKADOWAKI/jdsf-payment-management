@@ -14,7 +14,7 @@ type UserData = {
   bankHolder: string;
 };
 
-const UserProfile = () => {
+const Account = () => {
   const [formData, setFormData] = useState<UserData>({
     fullName: "",
     email: "",
@@ -25,7 +25,7 @@ const UserProfile = () => {
     bankHolder: "",
   });
 
-  const [isEditing, setIsEditing] = useState(false); // 🔥 編集モードの状態
+  const [isEditing, setIsEditing] = useState(false); // 編集モードの状態
 
   //ユーザープロフィール情報取得
   useEffect(() => {
@@ -145,5 +145,4 @@ const UserProfile = () => {
   );
 };
 
-export default UserProfile;
-
+export default Account;

@@ -1,21 +1,12 @@
-import React from 'react'
-import useUserRole from '../hooks/useUserRole';
-import AdminDashboard from '../components/AdminDashboard';
-import UserDashboard from '../components/UserDashboard';
-import { Navigate } from 'react-router-dom';
+import React from "react";
+import useUserRole from "../hooks/useUserRole";
+import AppLayout from "../components/common/AppLayout";
 
 const Dashboard = () => {
-    const { role, loading } = useUserRole();
+  const { loading } = useUserRole();
+  if (loading) return <p>Loading...</p>;
 
-    if (loading) return <p>Loading...</p>;
+  return <AppLayout />;
+};
 
-    if (role === "admin") {
-        return <AdminDashboard />;
-    } else if (role === "user") {
-        return <UserDashboard />
-    } else {
-        return <Navigate to="/" />
-    }
-}
-
-export default Dashboard
+export default Dashboard;

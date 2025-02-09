@@ -99,7 +99,6 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
         if (!validateInputs()) return;
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            alert("ログイン成功！");
             navigate("/dashboard"); // 成功時にリダイレクト
         } catch (error) {
             console.error("ログインエラー:", error);
@@ -133,7 +132,6 @@ export default function LogIn(props: { disableCustomTheme?: boolean }) {
                     bankHolder: "",
                 })
             }
-            alert("ログイン成功！");
             navigate("/dashboard"); // 成功時にリダイレクト
         } catch (error) {
             console.error("Googleログインエラー:", error);

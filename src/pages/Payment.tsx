@@ -29,6 +29,10 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { v4 as uuidv4 } from "uuid"; // ランダムなID生成用ライブラリ
+import Comment from "../components/Comment";
+import { auth } from "../firebase";
+import useUserRole from "../hooks/useUserRole";
 
 type Expense = {
   date: string;
@@ -122,9 +126,8 @@ const categoryOptions: Record<string, string[]> = {
 // 精算ページのUIを履歴ページでテスト中
 const Payment = ({
   selectedSettlement,
-  isEditable,
 }: {
-  selectedSettlement?: Settlement;
+  selectedSettlement: Settlement;
   isEditable: boolean;
 }) => {
   const [projectName, setProjectName] = useState(
@@ -140,6 +143,7 @@ const Payment = ({
   //精算一覧 表示用
 
   const db = getFirestore(); // Firestore のインスタンスを取得
+  const { role, user } = useUserRole();
 
   useEffect(() => {
     if (selectedSettlement) {
@@ -148,16 +152,14 @@ const Payment = ({
       setEndDate(selectedSettlement.endDate);
       setExpenses(selectedSettlement.expenses);
     }
-  }, [selectedSettlement]);
+  }, [selectedSettlement, role, user]);
+
+  const [settlementId, setSettlementId] = useState(
+    selectedSettlement?.id || uuidv4()
+  );
 
   // 申請後の編集制限
   const [isSubmitted, setIsSubmitted] = useState(false);
-
-  // コメントの管理（将来的には Firestore へ保存）
-  const [commentText, setCommentText] = useState("");
-  const [comments, setComments] = useState<
-    { text: string; role: string; timestamp: string }[]
-  >([]);
 
   //精算入力フォーム用
   const [currentExpense, setCurrentExpense] = useState<Expense>({
@@ -212,15 +214,6 @@ const Payment = ({
     } else {
       setExpenses((prev) => [...prev, { ...currentExpense }]);
     }
-    //Firestoreに保存
-    try {
-      await addDoc(collection(db, "expenses"), currentExpense);
-      alert("Firestoreに保存しました");
-    } catch (error) {
-      console.error("Firestore 保存エラー:", error);
-      alert("Firestoreに保存に失敗しました。");
-    }
-    setCurrentExpense((prev) => ({ ...prev, receipt: "" }));
   };
 
   //経費を編集
@@ -255,32 +248,8 @@ const Payment = ({
     setFileName(null);
   };
 
-  // 🆕 コメントを追加する
-  const handleAddComment = () => {
-    if (commentText.trim() === "") return;
-
-    const newComment = {
-      text: commentText,
-      role: "user", // ここは将来的に Firestore からユーザー情報を取得して変更可能
-      timestamp: new Date().toLocaleTimeString(),
-    };
-
-    setComments([...comments, newComment]);
-    setCommentText(""); // 入力欄をクリア
-  };
-
-  // 🆕 コメントを削除する（申請前のみ）
-  const handleDeleteComment = (index: number) => {
-    if (!isSubmitted) {
-      setComments(comments.filter((_, i) => i !== index));
-    }
-  };
-
   // 🆕 申請処理（仮）
   const handleSubmit = async () => {
-    const auth = getAuth();
-    console.log("✅ ログイン中のユーザー:", auth.currentUser);
-
     const user = auth.currentUser;
     if (!user) {
       alert("ログインしてください");
@@ -305,6 +274,7 @@ const Payment = ({
     const userData = userSnap.data();
 
     const settlementData = {
+      id: settlementId,
       applicantId: user.uid,
       applicantName: user.displayName || "未設定",
       projectName,
@@ -313,7 +283,6 @@ const Payment = ({
       submittedAt: Timestamp.now(),
       expenses,
       status: "申請中",
-      comments: [],
       role: userData.role, // 🔥 ユーザーの role を保存
     };
 
@@ -330,6 +299,25 @@ const Payment = ({
     }
 
     setIsSubmitted(true); // 申請後に編集不可にする
+  };
+
+  //承認
+  const handleApprove = async () => {
+    if (!selectedSettlement) {
+      alert("承認対象の.精算データが見つかりません。");
+      return;
+    }
+
+    try {
+      console.log("Firestore パス:", `settlements/${selectedSettlement.id}`);
+      const settlementRef = doc(db, "settlements", selectedSettlement.id);
+      await updateDoc(settlementRef, { status: "承認" });
+      alert("精算を承認しました。");
+      setIsSubmitted(true); // 申請後に編集不可にする
+    } catch (error) {
+      console.error("❌ Firestore 更新エラー:", error);
+      alert("Firestore に更新できませんでした。");
+    }
   };
 
   // 経費を一時保存する
@@ -349,6 +337,7 @@ const Payment = ({
     const db = getFirestore();
 
     const draftData = {
+      id: settlementId,
       applicantId: user.uid,
       applicantName: user.displayName || "未設定",
       projectName,
@@ -357,7 +346,6 @@ const Payment = ({
       submittedAt: Timestamp.now(),
       expenses,
       status: "編集中",
-      comments: [],
     };
 
     try {
@@ -600,7 +588,6 @@ const Payment = ({
           )}
         </Box>
       </Modal>
-
       {/* 経費追加ボタン */}
       <Button
         variant="contained"
@@ -608,6 +595,7 @@ const Payment = ({
         onClick={handleAddNewExpense}
         fullWidth
         sx={{ mt: 2 }}
+        disabled={isSubmitted}
       >
         経費を追加
       </Button>
@@ -660,80 +648,57 @@ const Payment = ({
           </List>
         </Box>
       )}
-
       <Typography variant="h6" sx={{ mt: 3 }}>
         合計額:
         {expenses.reduce((total, item) => total + Number(item.amount), 0)}円
       </Typography>
-
       {/* 🆕 コメント欄 */}
-      <Typography variant="h6" sx={{ mt: 3 }}>
-        コメント(任意)
-      </Typography>
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-        <TextField
-          label="コメントを入力"
-          value={commentText}
-          onChange={(e) => setCommentText(e.target.value)}
-          fullWidth
-          multiline
-          rows={2}
-        />
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleAddComment}
-          startIcon={<SendIcon />}
-          disabled={isSubmitted}
-        >
-          送信
-        </Button>
-      </Box>
-
-      {/* 🆕 コメント一覧 */}
-      <List sx={{ mt: 2, maxHeight: "200px", overflowY: "auto" }}>
-        {comments.map((comment, index) => (
-          <ListItem
-            key={index}
-            secondaryAction={
-              !isSubmitted && (
-                <IconButton
-                  edge="end"
-                  onClick={() => handleDeleteComment(index)}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              )
-            }
-          >
-            <ListItemText
-              primary={`${comment.role === "user" ? "あなた" : "管理者"}: ${
-                comment.text
-              }`}
-              secondary={comment.timestamp}
-            />
-          </ListItem>
-        ))}
-      </List>
+      <Comment settlementId={settlementId} isSubmitted={isSubmitted} />
 
       {/* 申請・一時保存ボタン */}
-      <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
-        <Button
-          variant="outlined"
-          onClick={handleSaveDraft}
-          disabled={isSubmitted}
+      {role === "admin" ? (
+        <>
+          <Box
+            sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}
+          >
+            <Button
+              variant="outlined"
+              onClick={handleSaveDraft}
+              disabled={isSubmitted}
+            >
+              差し戻し
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleApprove}
+              disabled={isSubmitted}
+            >
+              承認
+            </Button>
+          </Box>
+        </>
+      ) : (
+        <Box
+          sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}
         >
-          一時保存
-        </Button>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleSubmit}
-          disabled={isSubmitted}
-        >
-          申請
-        </Button>
-      </Box>
+          <Button
+            variant="outlined"
+            onClick={handleSaveDraft}
+            disabled={isSubmitted}
+          >
+            一時保存
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleSubmit}
+            disabled={isSubmitted}
+          >
+            申請
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 };
