@@ -25,6 +25,7 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import Payment from "./Payment";
+import useUserRole from "../hooks/useUserRole";
 
 type Expense = {
   date: string;
@@ -46,6 +47,7 @@ type Settlement = {
   endDate: string;
   submittedAt: { seconds: number };
   expenses: Expense[];
+  applicantName: string;
 };
 
 const History = () => {
@@ -62,28 +64,47 @@ const History = () => {
     useState<Settlement | null>(null);
   const [open, setOpen] = useState(false);
   const [editable, setEditable] = useState(false);
+  const { role, loading } = useUserRole();
 
   useEffect(() => {
     if (!user) return;
     const fetchSettlements = async () => {
-      try {
-        const q = query(
-          collection(db, "settlements"),
-          where("applicantId", "==", user.uid)
-        );
-        const querySnapshot = await getDocs(q);
-        const settlementsData: Settlement[] = querySnapshot.docs.map((doc) => {
-          const data = doc.data() as Omit<Settlement, "id">;
-          return { id: doc.id, ...data };
-        });
-        setSettlements(settlementsData);
-        setFilteredSettlements(settlementsData);
-      } catch (error) {
-        console.error("Firestore データ取得エラー: ", error);
+      if (role === "admin") {
+        try {
+          const querySnapshot = await getDocs(collection(db, "settlements"));
+          const settlementsData: Settlement[] = querySnapshot.docs.map(
+            (doc) => {
+              const data = doc.data() as Omit<Settlement, "id">;
+              return { id: doc.id, ...data };
+            }
+          );
+          setSettlements(settlementsData);
+          setFilteredSettlements(settlementsData);
+        } catch (error) {
+          console.error("Admin Firestore データ取得エラー: ", error);
+        }
+      } else {
+        try {
+          const q = query(
+            collection(db, "settlements"),
+            where("applicantId", "==", user.uid)
+          );
+          const querySnapshot = await getDocs(q);
+          const settlementsData: Settlement[] = querySnapshot.docs.map(
+            (doc) => {
+              const data = doc.data() as Omit<Settlement, "id">;
+              return { id: doc.id, ...data };
+            }
+          );
+          setSettlements(settlementsData);
+          setFilteredSettlements(settlementsData);
+        } catch (error) {
+          console.error("Firestore データ取得エラー: ", error);
+        }
       }
     };
     fetchSettlements();
-  }, [user, db]);
+  }, [user, db, settlements]);
 
   const handleStatusFilterChange = (event: SelectChangeEvent<string>) => {
     const selectedStatus = event.target.value;
@@ -107,7 +128,6 @@ const History = () => {
     setOpen(false);
     setSelectedSettlement(null);
   };
-
   return (
     <Box sx={{ maxWidth: "800px", margin: "auto", p: 3 }}>
       <Typography variant="h4">申請履歴</Typography>
@@ -132,9 +152,21 @@ const History = () => {
             <ListItem key={settlement.id}>
               <ListItemText
                 primary={`${settlement.projectName} - ${settlement.status}`}
-                secondary={`申請日: ${new Date(
-                  settlement.submittedAt.seconds * 1000
-                ).toLocaleDateString()}`}
+                secondary={
+                  <>
+                    {role === "admin" && (
+                      <Typography variant="body2" color="textSecondary">
+                        申請者:{settlement.applicantName}
+                      </Typography>
+                    )}
+                    <Typography variant="body2" color="textSecondary">
+                      申請日: 
+                      {new Date(
+                        settlement.submittedAt.seconds * 1000
+                      ).toLocaleDateString()}
+                    </Typography>
+                  </>
+                }
               />
               <Button
                 variant="outlined"
