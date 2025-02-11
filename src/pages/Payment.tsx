@@ -29,32 +29,10 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { v4 as uuidv4 } from "uuid"; // ランダムなID生成用ライブラリ
 import Comment from "../components/Comment";
 import { auth } from "../firebase";
 import useUserRole from "../hooks/useUserRole";
-
-type Expense = {
-  date: string;
-  vendor: string;
-  description: string;
-  category: string;
-  subcategory: string;
-  amount: string;
-  currency: string;
-  receipt: string | null;
-  fileName: string | null;
-};
-
-type Settlement = {
-  id: string;
-  status: string;
-  projectName: string;
-  startDate: string;
-  endDate: string;
-  submittedAt: { seconds: number };
-  expenses: any[];
-};
+import { Settlement, Expense } from "../types";
 
 const categoryOptions: Record<string, string[]> = {
   諸謝金: [
@@ -123,12 +101,14 @@ const categoryOptions: Record<string, string[]> = {
   ],
 };
 
-// 精算ページのUIを履歴ページでテスト中
 const Payment = ({
   selectedSettlement,
+  setSelectedSettlement,
 }: {
-  selectedSettlement: Settlement;
-  isEditable: boolean;
+  selectedSettlement: Settlement | null;
+  setSelectedSettlement?: React.Dispatch<
+    React.SetStateAction<Settlement | null>
+  >;
 }) => {
   const [projectName, setProjectName] = useState(
     selectedSettlement?.projectName || ""
@@ -140,26 +120,35 @@ const Payment = ({
   const [expenses, setExpenses] = useState<Expense[]>(
     selectedSettlement?.expenses || []
   );
-  //精算一覧 表示用
 
+  const [status, setStatus] = useState(selectedSettlement?.status || "編集中");
+
+  //精算一覧 表示用
   const db = getFirestore(); // Firestore のインスタンスを取得
   const { role, user } = useUserRole();
 
   useEffect(() => {
-    if (selectedSettlement) {
-      setProjectName(selectedSettlement.projectName);
-      setStartDate(selectedSettlement.startDate);
-      setEndDate(selectedSettlement.endDate);
+    if (!selectedSettlement) return;
+    console.log("設定されましたよ");
+
+    setProjectName(selectedSettlement.projectName || "");
+    setStartDate(selectedSettlement.startDate || "");
+    setEndDate(selectedSettlement.endDate || "");
+    setExpenses(selectedSettlement.expenses || []);
+    setStatus(selectedSettlement.status || "編集中");
+    if (selectedSettlement.expenses) {
       setExpenses(selectedSettlement.expenses);
     }
-  }, [selectedSettlement, role, user]);
+  }, [selectedSettlement]);
+
+  const isDisabled = !selectedSettlement
+    ? false
+    : (role === "user" && ["申請中", "承認"].includes(status)) ||
+      (role === "admin" && ["差し戻し", "承認", "一時保存"].includes(status));
 
   const [settlementId, setSettlementId] = useState(
-    selectedSettlement?.id || uuidv4()
+    selectedSettlement?.id || null
   );
-
-  // 申請後の編集制限
-  const [isSubmitted, setIsSubmitted] = useState(false);
 
   //精算入力フォーム用
   const [currentExpense, setCurrentExpense] = useState<Expense>({
@@ -183,6 +172,8 @@ const Payment = ({
   const [fileName, setFileName] = useState<string | null>(null);
 
   const handleAddNewExpense = () => {
+    console.log(loading);
+    console.log(isDisabled);
     setIsModalOpen(true);
     setCurrentExpense((prev) => ({
       ...prev,
@@ -194,26 +185,16 @@ const Payment = ({
 
   // 経費を追加・更新する
   const handleSaveExpense = async () => {
-    if (
-      !currentExpense.date ||
-      !currentExpense.vendor ||
-      !currentExpense.amount
-    ) {
-      alert("日付、取引先、金額を入力してください。");
-      return;
-    }
-
-    //編集モード
-    if (editingIndex !== null) {
-      const updatedExpenses = [...expenses];
-      updatedExpenses[editingIndex] = {
-        ...currentExpense,
-      };
-      setExpenses(updatedExpenses);
-      setEditingIndex(null);
-    } else {
-      setExpenses((prev) => [...prev, { ...currentExpense }]);
-    }
+    setExpenses((prevExpenses) => {
+      if (editingIndex !== null && editingIndex >= 0) {
+        return prevExpenses.map((expense, index) =>
+          index === editingIndex ? { ...currentExpense } : expense
+        );
+      } else {
+        return [...prevExpenses, { ...currentExpense }];
+      }
+    });
+    setEditingIndex(null);
   };
 
   //経費を編集
@@ -248,7 +229,7 @@ const Payment = ({
     setFileName(null);
   };
 
-  // 🆕 申請処理（仮）
+  // 🆕 申請処理
   const handleSubmit = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -274,7 +255,6 @@ const Payment = ({
     const userData = userSnap.data();
 
     const settlementData = {
-      id: settlementId,
       applicantId: user.uid,
       applicantName: user.displayName || "未設定",
       projectName,
@@ -283,37 +263,73 @@ const Payment = ({
       submittedAt: Timestamp.now(),
       expenses,
       status: "申請中",
+      isEditable: false,
       role: userData.role, // 🔥 ユーザーの role を保存
     };
 
+
     try {
-      const docRef = await addDoc(
-        collection(db, "settlements"),
-        settlementData
-      );
-      alert("精算申請を送信しました");
-      console.log("✅ Firestore に保存成功: ", docRef.id);
+      let settlementIdToUpdate = selectedSettlement?.id || "";
+
+
+      if (selectedSettlement?.id) {
+        const settlementRef = doc(db, "settlements", selectedSettlement.id);
+        await updateDoc(settlementRef, settlementData);
+        alert("精算申請を送信しました");
+        console.log("✅ Firestore に更新成功: ", selectedSettlement.id);
+        setSettlementId(selectedSettlement.id);
+      } else {
+        const docRef = await addDoc(
+          collection(db, "settlements"),
+          settlementData
+        );
+        await updateDoc(doc(db, "settlements", docRef.id), { id: docRef.id });
+        settlementIdToUpdate = docRef.id;
+        console.log("✅ Firestore に新規保存成功: ", docRef.id);
+      }
+      setSettlementId(settlementIdToUpdate);
+      setStatus("申請中");
+
+      if (setSelectedSettlement) {
+        setSelectedSettlement((prev) =>
+          prev ? { ...prev, id: settlementIdToUpdate } : null
+        );
+      }
     } catch (error) {
       console.error("❌ Firestore 保存エラー:", error);
       alert("Firestore に保存できませんでした。");
     }
-
-    setIsSubmitted(true); // 申請後に編集不可にする
   };
 
   //承認
   const handleApprove = async () => {
     if (!selectedSettlement) {
-      alert("承認対象の.精算データが見つかりません。");
+      alert("承認対象の精算データが見つかりません。");
       return;
     }
 
     try {
-      console.log("Firestore パス:", `settlements/${selectedSettlement.id}`);
       const settlementRef = doc(db, "settlements", selectedSettlement.id);
-      await updateDoc(settlementRef, { status: "承認" });
+      await updateDoc(settlementRef, { status: "承認", isEditable: false });
+      setStatus("承認");
       alert("精算を承認しました。");
-      setIsSubmitted(true); // 申請後に編集不可にする
+    } catch (error) {
+      console.error("❌ Firestore 更新エラー:", error);
+      alert("Firestore に更新できませんでした。");
+    }
+  };
+
+  const handleDecline = async () => {
+    if (!selectedSettlement) {
+      alert("承認対象の精算データが見つかりません。");
+      return;
+    }
+
+    try {
+      const settlementRef = doc(db, "settlements", selectedSettlement.id);
+      await updateDoc(settlementRef, { status: "差し戻し", isEditable: false });
+      setStatus("差し戻し");
+      alert("精算を差し戻しました。");
     } catch (error) {
       console.error("❌ Firestore 更新エラー:", error);
       alert("Firestore に更新できませんでした。");
@@ -347,6 +363,7 @@ const Payment = ({
       expenses,
       status: "編集中",
     };
+
 
     try {
       if (selectedSettlement?.id) {
@@ -395,6 +412,7 @@ const Payment = ({
             onChange={(e) => setProjectName(e.target.value)}
             fullWidth
             sx={{ mb: 2 }}
+            disabled={isDisabled}
           />
         </Grid>
 
@@ -406,6 +424,7 @@ const Payment = ({
             onChange={(e) => setStartDate(e.target.value)}
             fullWidth
             InputLabelProps={{ shrink: true }}
+            disabled={isDisabled}
           />
         </Grid>
         <Grid item xs={6}>
@@ -416,6 +435,7 @@ const Payment = ({
             onChange={(e) => setEndDate(e.target.value)}
             fullWidth
             InputLabelProps={{ shrink: true }}
+            disabled={isDisabled}
           />
         </Grid>
       </Grid>
@@ -574,18 +594,16 @@ const Payment = ({
               )}
             </Grid>
           </Grid>
-          {!isSubmitted && (
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleSaveExpense()}
-              fullWidth
-              sx={{ mt: 2 }}
-              disabled={loading}
-            >
-              経費を追加
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleSaveExpense()}
+            fullWidth
+            sx={{ mt: 2 }}
+            disabled={loading === true || isDisabled === true}
+          >
+            経費を追加
+          </Button>
         </Box>
       </Modal>
       {/* 経費追加ボタン */}
@@ -595,7 +613,7 @@ const Payment = ({
         onClick={handleAddNewExpense}
         fullWidth
         sx={{ mt: 2 }}
-        disabled={isSubmitted}
+        disabled={isDisabled}
       >
         経費を追加
       </Button>
@@ -614,14 +632,14 @@ const Payment = ({
                     <IconButton
                       edge="end"
                       onClick={() => modifyExpense(index)}
-                      disabled={isSubmitted}
+                      disabled={isDisabled}
                     >
                       <EditIcon />
                     </IconButton>
                     <IconButton
                       edge="end"
                       onClick={() => handleDeleteExpense(index)}
-                      disabled={isSubmitted}
+                      disabled={isDisabled}
                     >
                       <DeleteIcon />
                     </IconButton>
@@ -653,7 +671,7 @@ const Payment = ({
         {expenses.reduce((total, item) => total + Number(item.amount), 0)}円
       </Typography>
       {/* 🆕 コメント欄 */}
-      <Comment settlementId={settlementId} isSubmitted={isSubmitted} />
+      <Comment settlementId={settlementId || ""} />
 
       {/* 申請・一時保存ボタン */}
       {role === "admin" ? (
@@ -663,8 +681,8 @@ const Payment = ({
           >
             <Button
               variant="outlined"
-              onClick={handleSaveDraft}
-              disabled={isSubmitted}
+              onClick={handleDecline}
+              disabled={isDisabled}
             >
               差し戻し
             </Button>
@@ -672,7 +690,7 @@ const Payment = ({
               variant="contained"
               color="primary"
               onClick={handleApprove}
-              disabled={isSubmitted}
+              disabled={isDisabled}
             >
               承認
             </Button>
@@ -685,7 +703,7 @@ const Payment = ({
           <Button
             variant="outlined"
             onClick={handleSaveDraft}
-            disabled={isSubmitted}
+            disabled={isDisabled}
           >
             一時保存
           </Button>
@@ -693,7 +711,7 @@ const Payment = ({
             variant="contained"
             color="primary"
             onClick={handleSubmit}
-            disabled={isSubmitted}
+            disabled={isDisabled}
           >
             申請
           </Button>
