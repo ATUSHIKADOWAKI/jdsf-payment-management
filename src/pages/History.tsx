@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { SelectChangeEvent } from "@mui/material";
 import {
   Box,
@@ -18,6 +18,8 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import {
   collection,
+  doc,
+  getDoc,
   getDocs,
   getFirestore,
   query,
@@ -26,29 +28,7 @@ import {
 import { getAuth } from "firebase/auth";
 import Payment from "./Payment";
 import useUserRole from "../hooks/useUserRole";
-
-type Expense = {
-  date: string;
-  vendor: string;
-  description: string;
-  category: string;
-  subcategory: string;
-  amount: string;
-  currency: string;
-  receipt: string | null;
-  fileName: string | null;
-};
-
-type Settlement = {
-  id: string;
-  status: string;
-  projectName: string;
-  startDate: string;
-  endDate: string;
-  submittedAt: { seconds: number };
-  expenses: Expense[];
-  applicantName: string;
-};
+import { Settlement } from "../types";
 
 const History = () => {
   const db = getFirestore();
@@ -56,9 +36,6 @@ const History = () => {
   const user = auth.currentUser;
 
   const [settlements, setSettlements] = useState<Settlement[]>([]);
-  const [filteredSettlements, setFilteredSettlements] = useState<Settlement[]>(
-    []
-  );
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedSettlement, setSelectedSettlement] =
     useState<Settlement | null>(null);
@@ -66,8 +43,15 @@ const History = () => {
   const [editable, setEditable] = useState(false);
   const { role, loading } = useUserRole();
 
+  const filteredSettlements = useMemo(() => {
+    if (statusFilter === "all") {
+      return settlements;
+    }
+    return settlements.filter((s) => s.status === statusFilter);
+  }, [statusFilter, settlements]);
+
   useEffect(() => {
-    if (!user) return;
+    if (!user || loading) return;
     const fetchSettlements = async () => {
       if (role === "admin") {
         try {
@@ -79,7 +63,6 @@ const History = () => {
             }
           );
           setSettlements(settlementsData);
-          setFilteredSettlements(settlementsData);
         } catch (error) {
           console.error("Admin Firestore データ取得エラー: ", error);
         }
@@ -97,31 +80,38 @@ const History = () => {
             }
           );
           setSettlements(settlementsData);
-          setFilteredSettlements(settlementsData);
         } catch (error) {
           console.error("Firestore データ取得エラー: ", error);
         }
       }
     };
     fetchSettlements();
-  }, [user, db, settlements]);
+  }, [user, role, loading]);
 
   const handleStatusFilterChange = (event: SelectChangeEvent<string>) => {
-    const selectedStatus = event.target.value;
-    setStatusFilter(selectedStatus);
-    if (selectedStatus === "all") {
-      setFilteredSettlements(settlements);
-    } else {
-      setFilteredSettlements(
-        settlements.filter((s) => s.status === selectedStatus)
-      );
-    }
+    setStatusFilter(event.target.value);
   };
 
-  const handleOpenModal = (settlement: Settlement) => {
-    setSelectedSettlement({ ...settlement });
-    setEditable(settlement.status === "編集中" || settlement.status === "却下");
-    setOpen(true);
+  const handleOpenModal = async (settlement: Settlement) => {
+    try {
+      const docRef = doc(db, "settlements", settlement.id);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        setSelectedSettlement({
+          id: docSnap.id,
+          ...docSnap.data(),
+        } as Settlement);
+      } else {
+        setSelectedSettlement(settlement);
+      }
+      setEditable(
+        settlement.status === "編集中" || settlement.status === "差し戻し"
+      );
+      setOpen(true);
+    } catch (error) {
+      console.log("❌ Firestore データ取得エラー:", error);
+    }
   };
 
   const handleCloseModal = () => {
@@ -160,7 +150,7 @@ const History = () => {
                       </Typography>
                     )}
                     <Typography variant="body2" color="textSecondary">
-                      申請日: 
+                      申請日:
                       {new Date(
                         settlement.submittedAt.seconds * 1000
                       ).toLocaleDateString()}
@@ -198,7 +188,7 @@ const History = () => {
           {selectedSettlement && (
             <Payment
               selectedSettlement={selectedSettlement}
-              isEditable={editable}
+              setSelectedSettlement={setSelectedSettlement}
             />
           )}
         </DialogContent>

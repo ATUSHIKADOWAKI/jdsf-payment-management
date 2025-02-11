@@ -27,7 +27,6 @@ import { getAuth } from "firebase/auth";
 // **Props の型を定義**
 type CommentProps = {
   settlementId: string;
-  isSubmitted: boolean;
 };
 
 type CommentData = {
@@ -40,7 +39,7 @@ type CommentData = {
   settlementId: string;
 };
 
-const Comment: React.FC<CommentProps> = ({ settlementId, isSubmitted }) => {
+const Comment: React.FC<CommentProps> = ({ settlementId }) => {
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState<CommentData[]>([]);
   const db = getFirestore();
@@ -116,37 +115,33 @@ const Comment: React.FC<CommentProps> = ({ settlementId, isSubmitted }) => {
               primary={`${comment.userName}: ${comment.text}`}
               secondary={comment.timestamp.toDate().toLocaleString()}
             />
-            {!isSubmitted && (
-              <IconButton
-                edge="end"
-                onClick={() => handleDeleteComment(comment.id)} // ✅ 修正
-              >
-                <DeleteIcon />
-              </IconButton>
-            )}
+
+            <IconButton
+              edge="end"
+              onClick={() => handleDeleteComment(comment.id)} // ✅ 修正
+            >
+              <DeleteIcon />
+            </IconButton>
           </ListItem>
         ))}
       </List>
-      {!isSubmitted && (
-        <>
-          <TextField
-            label="コメントを入力"
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            fullWidth
-            multiline
-            rows={2}
-          />
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleAddComment}
-            startIcon={<SendIcon />}
-          >
-            送信
-          </Button>
-        </>
-      )}
+
+      <TextField
+        label="コメントを入力"
+        value={commentText}
+        onChange={(e) => setCommentText(e.target.value)}
+        fullWidth
+        multiline
+        rows={2}
+      />
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={handleAddComment}
+        startIcon={<SendIcon />}
+      >
+        送信
+      </Button>
     </Box>
   );
 };
